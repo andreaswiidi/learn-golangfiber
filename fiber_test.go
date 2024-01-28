@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -362,4 +363,17 @@ func TestView(t *testing.T) {
 	assert.Contains(t, string(bytes), "Hello Title")
 	assert.Contains(t, string(bytes), "Hello Header")
 	assert.Contains(t, string(bytes), "Hello Content")
+}
+
+func TestClient(t *testing.T) {
+	client := fiber.AcquireClient()
+	defer fiber.ReleaseClient(client)
+
+	agent := client.Get("https://example.com/")
+	status, response, errors := agent.String()
+	assert.Nil(t, errors)
+	assert.Equal(t, 200, status)
+	assert.Contains(t, response, "Example Domain")
+
+	fmt.Println(response)
 }

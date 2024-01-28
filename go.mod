@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.0
+	github.com/gofiber/template/mustache/v2 v2.0.8
 	github.com/stretchr/testify v1.8.4
 )
 
@@ -12,7 +13,6 @@ require (
 	github.com/cbroglie/mustache v1.4.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gofiber/template v1.8.2 // indirect
-	github.com/gofiber/template/mustache/v2 v2.0.8 // indirect
 	github.com/gofiber/utils v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.17.5 // indirect
