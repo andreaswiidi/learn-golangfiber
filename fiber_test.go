@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -13,10 +14,19 @@ import (
 	_ "embed"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/template/mustache/v2"
 	"github.com/stretchr/testify/assert"
 )
 
-var app = fiber.New()
+var engine = mustache.New("./template", ".mustache")
+
+var app = fiber.New(fiber.Config{
+	Views: engine,
+	ErrorHandler: func(ctx *fiber.Ctx, err error) error {
+		ctx.Status(fiber.StatusInternalServerError)
+		return ctx.SendString("Error : " + err.Error())
+	},
+})
 
 type LoginRequest struct {
 	Username string `json:"username"`
@@ -245,4 +255,111 @@ func TestBodyParserXML(t *testing.T) {
 	bytes, err := io.ReadAll(response.Body)
 	assert.Nil(t, err)
 	assert.Equal(t, "Register Success Andreas", string(bytes))
+}
+
+func TestResponseJSON(t *testing.T) {
+	app.Get("/user", func(ctx *fiber.Ctx) error {
+		return ctx.JSON(fiber.Map{
+			"username": "khannedy",
+			"name":     "Eko Khannedy",
+		})
+	})
+
+	request := httptest.NewRequest("GET", "/user", nil)
+	request.Header.Set("Accept", "application/json")
+	response, err := app.Test(request)
+	assert.Nil(t, err)
+	assert.Equal(t, 200, response.StatusCode)
+
+	bytes, err := io.ReadAll(response.Body)
+	assert.Nil(t, err)
+	assert.Equal(t, `{"name":"Eko Khannedy","username":"khannedy"}`, string(bytes))
+}
+
+func TestDownloadFile(t *testing.T) {
+	app.Get("/download", func(ctx *fiber.Ctx) error {
+		return ctx.Download("./source/contoh.txt", "contoh.txt")
+	})
+
+	request := httptest.NewRequest("GET", "/download", nil)
+	response, err := app.Test(request)
+	assert.Nil(t, err)
+	assert.Equal(t, 200, response.StatusCode)
+	assert.Equal(t, `attachment; filename="contoh.txt"`, response.Header.Get("Content-Disposition"))
+
+	bytes, err := io.ReadAll(response.Body)
+	assert.Nil(t, err)
+	assert.Equal(t, "this is sample file for upload", string(bytes))
+}
+
+func TestRoutingGroup(t *testing.T) {
+	helloWorld := func(ctx *fiber.Ctx) error {
+		return ctx.SendString("Hello World")
+	}
+
+	api := app.Group("/api")
+	api.Get("/hello", helloWorld) // /api/hello
+	api.Get("/world", helloWorld) // /api/world
+
+	web := app.Group("/web")
+	web.Get("/hello", helloWorld) // /web/hello
+	web.Get("/world", helloWorld) // /web/world
+
+	request := httptest.NewRequest("GET", "/api/hello", nil)
+	response, err := app.Test(request)
+	assert.Nil(t, err)
+	assert.Equal(t, 200, response.StatusCode)
+
+	bytes, err := io.ReadAll(response.Body)
+	assert.Nil(t, err)
+	assert.Equal(t, "Hello World", string(bytes))
+}
+
+func TestStatic(t *testing.T) {
+	app.Static("/public", "./source")
+
+	request := httptest.NewRequest("GET", "/public/contoh.txt", nil)
+	response, err := app.Test(request)
+	assert.Nil(t, err)
+	assert.Equal(t, 200, response.StatusCode)
+
+	bytes, err := io.ReadAll(response.Body)
+	assert.Nil(t, err)
+	assert.Equal(t, "this is sample file for upload", string(bytes))
+}
+
+func TestErrorHandler(t *testing.T) {
+	app.Get("/error", func(ctx *fiber.Ctx) error {
+		return errors.New("ups")
+	})
+
+	request := httptest.NewRequest("GET", "/error", nil)
+	response, err := app.Test(request)
+	assert.Nil(t, err)
+	assert.Equal(t, 500, response.StatusCode)
+
+	bytes, err := io.ReadAll(response.Body)
+	assert.Nil(t, err)
+	assert.Equal(t, "Error : ups", string(bytes))
+}
+
+func TestView(t *testing.T) {
+	app.Get("/view", func(ctx *fiber.Ctx) error {
+		return ctx.Render("index", fiber.Map{
+			"title":   "Hello Title",
+			"header":  "Hello Header",
+			"content": "Hello Content",
+		})
+	})
+
+	request := httptest.NewRequest("GET", "/view", nil)
+	response, err := app.Test(request)
+	assert.Nil(t, err)
+	assert.Equal(t, 200, response.StatusCode)
+
+	bytes, err := io.ReadAll(response.Body)
+	assert.Nil(t, err)
+	assert.Contains(t, string(bytes), "Hello Title")
+	assert.Contains(t, string(bytes), "Hello Header")
+	assert.Contains(t, string(bytes), "Hello Content")
 }
